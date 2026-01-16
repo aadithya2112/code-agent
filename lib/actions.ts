@@ -172,7 +172,7 @@ export async function restartDevServer(sandboxId: string, projectId: Id<"project
     // We use a broad kill pattern for common dev servers
     console.log("[Restart] Killing old processes...");
     try {
-        await sandbox.commands.run("pkill -f 'next-server' || pkill -f 'vite' || pkill -f 'node'", { timeout: 5000 });
+        await sandbox.commands.run("pkill -f 'next-server' || pkill -f 'vite' || pkill -f 'node'");
     } catch (e: any) {
         // Ignore errors from pkill (e.g. if no process found or if it kills itself weirdly)
         console.log("[Restart] Kill command checked:", String(e));
