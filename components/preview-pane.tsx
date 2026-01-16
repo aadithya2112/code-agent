@@ -17,9 +17,10 @@ interface PreviewPaneProps {
   projectType: "react" | "nextjs" | null;
   status: "idle" | "working" | "ready" | "stopping";
   onStop: () => void;
+  onStart: () => void;
 }
 
-export default function PreviewPane({ sandboxID, port, projectType, status, onStop }: PreviewPaneProps) {
+export default function PreviewPane({ sandboxID, port, projectType, status, onStop, onStart }: PreviewPaneProps) {
   const [localPort, setLocalPort] = useState(port);
 
   // Sync prop port to local state when it changes
@@ -32,6 +33,31 @@ export default function PreviewPane({ sandboxID, port, projectType, status, onSt
     : "";
 
   if (!sandboxID || status === "idle") {
+      // If we have a project type and are idle, it means we are STOPPED.
+      // Show Play Button.
+      if (projectType) {
+          return (
+            <div className="flex flex-col h-full bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden shadow-lg relative items-center justify-center">
+                 <div className="flex flex-col items-center gap-6 z-10">
+                    <div className="w-20 h-20 rounded-full bg-neutral-800/50 border border-neutral-700 flex items-center justify-center">
+                        <button 
+                            onClick={onStart}
+                            className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-400 text-white flex items-center justify-center shadow-lg transform transition-all hover:scale-105 active:scale-95 group"
+                        >
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 ml-1 transition-transform group-hover:scale-110">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-neutral-300 font-medium">Dev Server Stopped</p>
+                        <p className="text-xs text-neutral-500 mt-1">Click play to resume coding</p>
+                    </div>
+                 </div>
+            </div>
+          );
+      }
+
       return (
         <div className="flex flex-col h-full bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden shadow-lg relative items-center justify-center">
              <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" 

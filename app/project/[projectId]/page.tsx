@@ -24,8 +24,43 @@ export default function ProjectPage() {
     const [port, setPort] = useState(0);
     const [projectType, setProjectType] = useState<"react" | "nextjs" | null>(null);
     const [status, setStatus] = useState<"idle" | "working" | "ready" | "stopping">("idle");
-
     const applyTemplate = useMutation(api.projects.applyTemplate);
+
+    const [hasFiles, setHasFiles] = useState(false);
+    
+    // Check if files exist to determine if we should auto-start or wait for prompt
+    const files = useQuery(api.files.getFiles, { projectId });
+    
+    useEffect(() => {
+        if (files && files.length > 0) {
+            setHasFiles(true);
+        }
+    }, [files]);
+
+    const startDevServer = async () => {
+        try {
+            setStatus("working");
+            const result = await initializeProject(projectId);
+            setSandboxID(result.sandboxId);
+            setPort(result.port);
+            // Deduce project type from port for PreviewPane usage (optional visual)
+            setProjectType(result.port === 3000 ? "nextjs" : "react"); 
+            setStatus("ready");
+        } catch(e) {
+            console.error("Failed to start server:", e);
+            setStatus("idle");
+        }
+    };
+
+    // Auto-start if files exist and we are idle (and haven't started yet)
+    // We use a ref or simple check to assume if we just loaded and have files, we work.
+    useEffect(() => {
+        if (status === "idle" && hasFiles && !sandboxID) {
+            startDevServer();
+        }
+    }, [hasFiles /*, status, sandboxID */]); 
+    // Careful with dependencies to avoid loop. 
+    // Just run once when `hasFiles` becomes true if IDLE.
 
     const handleInitialize = async (prompt: string) => {
         try {
@@ -39,11 +74,8 @@ export default function ProjectPage() {
             await applyTemplate({ projectId, template: type });
 
             // 3. Start Sandbox
-            const result = await initializeProject(projectId);
-            
-            setSandboxID(result.sandboxId);
-            setPort(result.port);
-            setStatus("ready");
+            await startDevServer();
+
         } catch (e) {
             console.error(e);
             setStatus("idle");
@@ -55,7 +87,7 @@ export default function ProjectPage() {
         setStatus("stopping");
         await stopSandbox(sandboxID);
         setSandboxID(null);
-        setProjectType(null);
+        // Do NOT clear projectType, so Preview knows what icon to show or that we exist
         setStatus("idle");
     };
 
@@ -94,6 +126,7 @@ export default function ProjectPage() {
                         projectType={projectType}
                         status={status}
                         onStop={handleStop}
+                        onStart={startDevServer}
                     />
                 </div>
              </div>
