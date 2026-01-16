@@ -3,6 +3,7 @@
 import { Square, Globe, RefreshCcw, ArrowLeft, ArrowRight, Code, AppWindow } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Loader } from "@/components/ai-elements/loader";
+import { cn } from "@/lib/utils";
 import {
   WebPreview,
   WebPreviewNavigation,
@@ -36,49 +37,72 @@ export default function PreviewPane({ projectId, sandboxID, port, projectType, s
     ? `https://${localPort}-${sandboxID}.e2b.app` 
     : "";
 
-  if (!sandboxID || status === "idle") {
-      // If we have a project type and are idle, it means we are STOPPED.
-      // Show Play Button.
-      if (projectType) {
+  // Determine content for Preview Mode based on status
+  const renderPreviewContent = () => {
+      if (!sandboxID || status === "idle") {
           return (
-            <div className="flex flex-col h-full bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden shadow-lg relative items-center justify-center">
-                 <div className="flex flex-col items-center gap-6 z-10">
-                    <div className="w-20 h-20 rounded-full bg-neutral-800/50 border border-neutral-700 flex items-center justify-center">
-                        <button 
-                            onClick={onStart}
-                            className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-400 text-white flex items-center justify-center shadow-lg transform transition-all hover:scale-105 active:scale-95 group"
-                        >
-                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 ml-1 transition-transform group-hover:scale-110">
-                                <path d="M8 5v14l11-7z" />
-                            </svg>
-                        </button>
+             <div className="flex flex-col h-full bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden shadow-lg relative items-center justify-center">
+                 {/* Background Pattern */}
+                 <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" 
+                     style={{ 
+                         backgroundImage: 'radial-gradient(circle at 1px 1px, #404040 1px, transparent 0)', 
+                         backgroundSize: '20px 20px' 
+                     }} 
+                />
+                 
+                 {projectType ? (
+                    <div className="flex flex-col items-center gap-6 z-10">
+                        <div className="w-20 h-20 rounded-full bg-neutral-800/50 border border-neutral-700 flex items-center justify-center">
+                            <button 
+                                onClick={onStart}
+                                className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-400 text-white flex items-center justify-center shadow-lg transform transition-all hover:scale-105 active:scale-95 group"
+                            >
+                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 ml-1 transition-transform group-hover:scale-110">
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-neutral-300 font-medium">Dev Server Stopped</p>
+                            <p className="text-xs text-neutral-500 mt-1">Click play to resume coding</p>
+                        </div>
+                     </div>
+                 ) : (
+                    <div className="flex flex-col items-center gap-3 opacity-60 relative z-10">
+                        <div className="w-16 h-16 rounded-2xl bg-neutral-900/50 border border-neutral-800/50 flex items-center justify-center rotate-3 transform transition-transform hover:rotate-6">
+                            <Globe size={32} className="text-neutral-700" />
+                        </div>
+                        <p className="text-sm text-neutral-600 font-medium tracking-wide">PREVIEW AREA</p>
                     </div>
-                    <div className="text-center">
-                        <p className="text-neutral-300 font-medium">Dev Server Stopped</p>
-                        <p className="text-xs text-neutral-500 mt-1">Click play to resume coding</p>
-                    </div>
-                 </div>
+                 )}
             </div>
           );
       }
 
       return (
-        <div className="flex flex-col h-full bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden shadow-lg relative items-center justify-center">
-             <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" 
-                 style={{ 
-                     backgroundImage: 'radial-gradient(circle at 1px 1px, #404040 1px, transparent 0)', 
-                     backgroundSize: '20px 20px' 
-                 }} 
-            />
-            <div className="flex flex-col items-center gap-3 opacity-60 relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-neutral-900/50 border border-neutral-800/50 flex items-center justify-center rotate-3 transform transition-transform hover:rotate-6">
-                    <Globe size={32} className="text-neutral-700" />
-                </div>
-                <p className="text-sm text-neutral-600 font-medium tracking-wide">PREVIEW AREA</p>
-            </div>
-        </div>
+          <WebPreviewBody 
+            className="bg-white"
+            loading={
+                status === "working" ? (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-neutral-900/90 backdrop-blur-[2px]">
+                       <div className="flex flex-col items-center gap-4">
+                         <div className="relative">
+                            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse"></div>
+                            <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center relative">
+                                <Loader size={32} className="text-blue-500 animate-spin" />
+                            </div>
+                         </div>
+                         <div className="text-center space-y-1">
+                            <p className="text-sm font-medium text-neutral-300">Setting up environment</p>
+                            <p className="text-xs text-neutral-500">Installing dependencies and starting server...</p>
+                         </div>
+                       </div>
+                    </div>
+                ) : undefined
+            } 
+           />
       );
-  }
+  };
 
   return (
     <WebPreview 
@@ -88,18 +112,18 @@ export default function PreviewPane({ projectId, sandboxID, port, projectType, s
     >
       <WebPreviewNavigation className="bg-neutral-950/80 backdrop-blur-sm border-b border-neutral-800 p-2 gap-2">
         <div className="flex items-center gap-1">
-            <WebPreviewNavigationButton disabled={viewMode !== "preview"} className="text-neutral-400">
+            <WebPreviewNavigationButton disabled={viewMode !== "preview" || !sandboxID} className="text-neutral-400">
                  <ArrowLeft size={14} />
             </WebPreviewNavigationButton>
-             <WebPreviewNavigationButton disabled={viewMode !== "preview"} className="text-neutral-400">
+             <WebPreviewNavigationButton disabled={viewMode !== "preview" || !sandboxID} className="text-neutral-400">
                  <ArrowRight size={14} />
             </WebPreviewNavigationButton>
-             <WebPreviewNavigationButton disabled={viewMode !== "preview"} tooltip="Reload" className="text-neutral-400 hover:text-white">
+             <WebPreviewNavigationButton disabled={viewMode !== "preview" || !sandboxID} tooltip="Reload" className="text-neutral-400 hover:text-white">
                  <RefreshCcw size={14} />
             </WebPreviewNavigationButton>
         </div>
 
-        <WebPreviewUrl className="bg-neutral-900 border-neutral-800 text-neutral-300 h-8" disabled={viewMode !== "preview"} />
+        <WebPreviewUrl className="bg-neutral-900 border-neutral-800 text-neutral-300 h-8" disabled={viewMode !== "preview" || !sandboxID} />
 
         <div className="flex items-center gap-2 ml-2">
              {/* View Toggle */}
@@ -134,8 +158,13 @@ export default function PreviewPane({ projectId, sandboxID, port, projectType, s
             
             <button 
                 onClick={onStop}
-                disabled={status === "stopping"}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded text-xs transition-colors"
+                disabled={status === "stopping" || status === "idle"}
+                className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1.5 border rounded text-xs transition-colors",
+                    status === "idle" 
+                        ? "bg-neutral-800/50 text-neutral-600 border-neutral-800 cursor-not-allowed"
+                        : "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20"
+                )}
                 title="Stop Sandbox"
             >
                 <Square size={10} fill="currentColor" />
@@ -143,30 +172,12 @@ export default function PreviewPane({ projectId, sandboxID, port, projectType, s
         </div>
       </WebPreviewNavigation>
 
-      {viewMode === "preview" ? (
-          <WebPreviewBody 
-            className="bg-white"
-            loading={
-                status === "working" ? (
-                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-neutral-900/90 backdrop-blur-[2px]">
-                       <div className="flex flex-col items-center gap-4">
-                         <div className="relative">
-                            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse"></div>
-                            <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center relative">
-                                <Loader size={32} className="text-blue-500 animate-spin" />
-                            </div>
-                         </div>
-                         <div className="text-center space-y-1">
-                            <p className="text-sm font-medium text-neutral-300">Setting up environment</p>
-                            <p className="text-xs text-neutral-500">Installing dependencies and starting server...</p>
-                         </div>
-                       </div>
-                    </div>
-                ) : undefined
-            } 
-           />
-      ) : (
-          <CodeExplorer projectId={projectId} className="flex-1 border-0 rounded-none bg-neutral-900" />
+      {viewMode === "preview" ? renderPreviewContent() : (
+          <CodeExplorer 
+              projectId={projectId} 
+              sandboxID={sandboxID}
+              className="flex-1 border-0 rounded-none bg-neutral-900" 
+          />
       )}
     </WebPreview>
   );

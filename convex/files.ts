@@ -1,6 +1,9 @@
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
+// Helper to normalize paths
+const normalizePath = (path: string) => path.replace(/^\/+/, '');
+
 // FILE OPERATIONS
 
 export const save = mutation({
@@ -17,11 +20,13 @@ export const save = mutation({
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Project not found");
     if (project.userId !== identity.tokenIdentifier) throw new Error("Unauthorized");
+    
+    const cleanPath = normalizePath(args.path);
 
     const existing = await ctx.db
         .query("files")
         .withIndex("by_projectId_path", (q) => 
-            q.eq("projectId", args.projectId).eq("path", args.path)
+            q.eq("projectId", args.projectId).eq("path", cleanPath)
         )
         .first();
 
@@ -30,7 +35,7 @@ export const save = mutation({
     } else {
         await ctx.db.insert("files", {
             projectId: args.projectId,
-            path: args.path,
+            path: cleanPath,
             content: args.content,
         });
     }
@@ -45,10 +50,11 @@ export const saveInternal = internalMutation({
     content: v.string(),
   },
   handler: async (ctx, args) => {
+    const cleanPath = normalizePath(args.path);
     const existing = await ctx.db
         .query("files")
         .withIndex("by_projectId_path", (q) => 
-            q.eq("projectId", args.projectId).eq("path", args.path)
+            q.eq("projectId", args.projectId).eq("path", cleanPath)
         )
         .first();
 
@@ -57,7 +63,7 @@ export const saveInternal = internalMutation({
     } else {
         await ctx.db.insert("files", {
             projectId: args.projectId,
-            path: args.path,
+            path: cleanPath,
             content: args.content,
         });
     }
@@ -67,10 +73,11 @@ export const saveInternal = internalMutation({
 export const read = query({
   args: { projectId: v.id("projects"), path: v.string() },
   handler: async (ctx, args) => {
+      const cleanPath = normalizePath(args.path);
       const file = await ctx.db
           .query("files")
           .withIndex("by_projectId_path", (q) => 
-              q.eq("projectId", args.projectId).eq("path", args.path)
+              q.eq("projectId", args.projectId).eq("path", cleanPath)
           )
           .first();
       return file ? file.content : null;
@@ -81,10 +88,11 @@ export const read = query({
 export const readInternal = internalQuery({
   args: { projectId: v.id("projects"), path: v.string() },
   handler: async (ctx, args) => {
+      const cleanPath = normalizePath(args.path);
       const file = await ctx.db
           .query("files")
           .withIndex("by_projectId_path", (q) => 
-              q.eq("projectId", args.projectId).eq("path", args.path)
+              q.eq("projectId", args.projectId).eq("path", cleanPath)
           )
           .first();
       return file ? file.content : null;
@@ -121,10 +129,11 @@ export const saveSystemTemplate = mutation({
         content: v.string()
     },
     handler: async (ctx, args) => {
+        const cleanPath = normalizePath(args.path);
         const existing = await ctx.db
         .query("files")
         .withIndex("by_projectId_path", (q) => 
-            q.eq("projectId", args.projectId).eq("path", args.path)
+            q.eq("projectId", args.projectId).eq("path", cleanPath)
         )
         .first();
 
@@ -133,7 +142,7 @@ export const saveSystemTemplate = mutation({
         } else {
             await ctx.db.insert("files", {
                 projectId: args.projectId,
-                path: args.path,
+                path: cleanPath,
                 content: args.content,
             });
         }
@@ -146,10 +155,11 @@ export const deleteFile = mutation({
         path: v.string()
     },
     handler: async (ctx, args) => {
+        const cleanPath = normalizePath(args.path);
         const existing = await ctx.db
             .query("files")
             .withIndex("by_projectId_path", (q) => 
-                q.eq("projectId", args.projectId).eq("path", args.path)
+                q.eq("projectId", args.projectId).eq("path", cleanPath)
             )
             .first();
         if (existing) {
@@ -165,10 +175,11 @@ export const deleteFileInternal = internalMutation({
         path: v.string()
     },
     handler: async (ctx, args) => {
+        const cleanPath = normalizePath(args.path);
         const existing = await ctx.db
             .query("files")
             .withIndex("by_projectId_path", (q) => 
-                q.eq("projectId", args.projectId).eq("path", args.path)
+                q.eq("projectId", args.projectId).eq("path", cleanPath)
             )
             .first();
         if (existing) {

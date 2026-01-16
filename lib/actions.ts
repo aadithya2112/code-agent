@@ -83,7 +83,7 @@ export async function detectProjectType(prompt: string): Promise<"react" | "next
 }
 
 // Hydrate E2B from Convex Files
-async function hydrateSandbox(sandbox: Sandbox, projectId: Id<"projects">) {
+export async function hydrateSandbox(sandbox: Sandbox, projectId: Id<"projects">) {
     const files = await convex.query(api.files.getFiles, { projectId });
     console.log(`[Hydrate] Found ${files.length} files for project ${projectId}`);
 
@@ -148,6 +148,53 @@ export async function setupProject(sandboxId: string, projectId: Id<"projects">)
     console.log(`[Setup] Server started (PID ${start.pid})`);
 
     return port;
+}
+
+export async function checkSandboxActive(sandboxId: string) {
+    try {
+        // Try to connect to check if valid
+        const sandbox = await Sandbox.connect(sandboxId);
+        // Maybe check if it's 'running' is enough? 
+        // Sandbox.connect doesn't throw if it exists.
+        return true;
+    } catch (e) {
+         return false;
+    }
+}
+
+export async function restartDevServer(sandboxId: string, projectId: Id<"projects">) {
+    if (!sandboxId) throw new Error("Sandbox ID required");
+    
+    console.log(`[Restart] Connecting to sandbox ${sandboxId}...`);
+    const sandbox = await Sandbox.connect(sandboxId);
+    
+    // 1. Kill existing dev server
+    // We use a broad kill pattern for common dev servers
+    console.log("[Restart] Killing old processes...");
+    try {
+        await sandbox.commands.run("pkill -f 'next-server' || pkill -f 'vite' || pkill -f 'node'", { timeout: 5000 });
+    } catch (e: any) {
+        // Ignore errors from pkill (e.g. if no process found or if it kills itself weirdly)
+        console.log("[Restart] Kill command checked:", String(e));
+    }
+    
+    // 2. Sync latest files
+    console.log("[Restart] Syncing files...");
+    await hydrateSandbox(sandbox, projectId);
+    
+    // 3. Start Server again
+    // We need to re-detect port/type just to be safe, or assume same?
+    // Safe to re-read package.json from disk (which we just synced)
+    const packageJsonContent = await sandbox.files.read("/home/user/app/package.json");
+    const packageJson = JSON.parse(packageJsonContent);
+    const isNext = !!(packageJson.dependencies?.next || packageJson.devDependencies?.next);
+    const port = isNext ? 3000 : 5173;
+    
+    console.log(`[Restart] Starting ${isNext ? "Next.js" : "React"} server...`);
+    const start = await sandbox.commands.run(`cd /home/user/app && npm run dev`, { background: true });
+    
+    console.log(`[Restart] Done. New PID: ${start.pid}`);
+    return { success: true, port };
 }
 
 export async function initializeProject(projectId: Id<"projects">) {

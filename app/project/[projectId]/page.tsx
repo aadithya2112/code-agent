@@ -87,30 +87,39 @@ export default function ProjectPage() {
     // Watch for agent completion signal to restart sandbox
     useEffect(() => {
         const handleAutoRestart = async () => {
+            // Check if we need restart AND have a sandbox AND it is ready
             if (project?.needsSandboxRestart && sandboxID && status === "ready") {
-                console.log("Agent completed - auto-restarting sandbox...");
+                console.log("Agent completed - restarting dev server...");
                 
                 // Clear flag immediately to prevent re-trigger
                 await clearRestartFlag({ projectId });
                 
-                // Stop current sandbox
-                await stopSandbox(sandboxID);
-                setSandboxID(null);
                 setStatus("working");
-                
-                // Start fresh sandbox with new files (with small delay)
-                setTimeout(async () => {
-                    try {
-                        const result = await initializeProject(projectId);
-                        setSandboxID(result.sandboxId);
-                        setPort(result.port);
-                        setStatus("ready");
-                        console.log("Sandbox restarted successfully!");
-                    } catch (error) {
-                        console.error("Restart failed:", error);
-                        setStatus("idle");
-                    }
-                }, 1000);
+
+                try {
+                    // Try to hot-restart first (faster)
+                    const { restartDevServer } = await import("@/lib/actions");
+                    await restartDevServer(sandboxID, projectId);
+                    console.log("Dev server restarted successfully!");
+                    setStatus("ready");
+                } catch (error) {
+                    console.error("Hot restart failed, falling back to full reboot:", error);
+                    // Fallback to full stop/start if hot restart fails
+                    await stopSandbox(sandboxID);
+                    setSandboxID(null);
+                    
+                    setTimeout(async () => {
+                         try {
+                            const result = await initializeProject(projectId);
+                            setSandboxID(result.sandboxId);
+                            setPort(result.port);
+                            setStatus("ready");
+                         } catch(e) {
+                             console.error("Full recovery failed:", e);
+                             setStatus("idle");
+                         }
+                    }, 1000);
+                }
             }
         };
         
