@@ -25,6 +25,8 @@ export default function ProjectPage() {
     const [projectType, setProjectType] = useState<"react" | "nextjs" | null>(null);
     const [status, setStatus] = useState<"idle" | "working" | "ready" | "stopping">("idle");
     const applyTemplate = useMutation(api.projects.applyTemplate);
+    const clearRestartFlag = useMutation(api.projects.clearRestartFlag);
+    const project = useQuery(api.projects.get, { projectId });
 
     const [hasFiles, setHasFiles] = useState(false);
     
@@ -82,6 +84,39 @@ export default function ProjectPage() {
         }
     };
 
+    // Watch for agent completion signal to restart sandbox
+    useEffect(() => {
+        const handleAutoRestart = async () => {
+            if (project?.needsSandboxRestart && sandboxID && status === "ready") {
+                console.log("Agent completed - auto-restarting sandbox...");
+                
+                // Clear flag immediately to prevent re-trigger
+                await clearRestartFlag({ projectId });
+                
+                // Stop current sandbox
+                await stopSandbox(sandboxID);
+                setSandboxID(null);
+                setStatus("working");
+                
+                // Start fresh sandbox with new files (with small delay)
+                setTimeout(async () => {
+                    try {
+                        const result = await initializeProject(projectId);
+                        setSandboxID(result.sandboxId);
+                        setPort(result.port);
+                        setStatus("ready");
+                        console.log("Sandbox restarted successfully!");
+                    } catch (error) {
+                        console.error("Restart failed:", error);
+                        setStatus("idle");
+                    }
+                }, 1000);
+            }
+        };
+        
+        handleAutoRestart();
+    }, [project?.needsSandboxRestart, sandboxID, status]);
+
     const handleStop = async () => {
         if (!sandboxID) return;
         setStatus("stopping");
@@ -121,6 +156,7 @@ export default function ProjectPage() {
                 {/* Main / Preview */}
                 <div className="flex-1 h-full">
                     <PreviewPane 
+                        projectId={projectId}
                         sandboxID={sandboxID} 
                         port={port}
                         projectType={projectType}

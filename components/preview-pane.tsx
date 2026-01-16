@@ -1,6 +1,6 @@
 "use client";
 
-import { Square, Globe, RefreshCcw, ArrowLeft, ArrowRight } from "lucide-react";
+import { Square, Globe, RefreshCcw, ArrowLeft, ArrowRight, Code, AppWindow } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Loader } from "@/components/ai-elements/loader";
 import {
@@ -10,8 +10,11 @@ import {
   WebPreviewBody,
   WebPreviewNavigationButton,
 } from "@/components/ai-elements/web-preview";
+import CodeExplorer from "@/components/code-explorer";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface PreviewPaneProps {
+  projectId: Id<"projects">;
   sandboxID: string | null;
   port: number;
   projectType: "react" | "nextjs" | null;
@@ -20,8 +23,9 @@ interface PreviewPaneProps {
   onStart: () => void;
 }
 
-export default function PreviewPane({ sandboxID, port, projectType, status, onStop, onStart }: PreviewPaneProps) {
+export default function PreviewPane({ projectId, sandboxID, port, projectType, status, onStop, onStart }: PreviewPaneProps) {
   const [localPort, setLocalPort] = useState(port);
+  const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
 
   // Sync prop port to local state when it changes
   useEffect(() => {
@@ -84,20 +88,38 @@ export default function PreviewPane({ sandboxID, port, projectType, status, onSt
     >
       <WebPreviewNavigation className="bg-neutral-950/80 backdrop-blur-sm border-b border-neutral-800 p-2 gap-2">
         <div className="flex items-center gap-1">
-            <WebPreviewNavigationButton disabled className="text-neutral-400">
+            <WebPreviewNavigationButton disabled={viewMode !== "preview"} className="text-neutral-400">
                  <ArrowLeft size={14} />
             </WebPreviewNavigationButton>
-             <WebPreviewNavigationButton disabled className="text-neutral-400">
+             <WebPreviewNavigationButton disabled={viewMode !== "preview"} className="text-neutral-400">
                  <ArrowRight size={14} />
             </WebPreviewNavigationButton>
-             <WebPreviewNavigationButton tooltip="Reload" className="text-neutral-400 hover:text-white">
+             <WebPreviewNavigationButton disabled={viewMode !== "preview"} tooltip="Reload" className="text-neutral-400 hover:text-white">
                  <RefreshCcw size={14} />
             </WebPreviewNavigationButton>
         </div>
 
-        <WebPreviewUrl className="bg-neutral-900 border-neutral-800 text-neutral-300 h-8" />
+        <WebPreviewUrl className="bg-neutral-900 border-neutral-800 text-neutral-300 h-8" disabled={viewMode !== "preview"} />
 
         <div className="flex items-center gap-2 ml-2">
+             {/* View Toggle */}
+             <div className="flex items-center bg-neutral-900 rounded-lg border border-neutral-800 p-0.5">
+                <button
+                    onClick={() => setViewMode("preview")}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === "preview" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-300"}`}
+                    title="Web Preview"
+                >
+                    <AppWindow size={14} />
+                </button>
+                <button
+                    onClick={() => setViewMode("code")}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === "code" ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-300"}`}
+                    title="Code Explorer"
+                >
+                    <Code size={14} />
+                </button>
+             </div>
+
              {status === "ready" && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/10 text-green-400 border border-green-500/20 whitespace-nowrap">
                   LIVE
@@ -121,27 +143,31 @@ export default function PreviewPane({ sandboxID, port, projectType, status, onSt
         </div>
       </WebPreviewNavigation>
 
-      <WebPreviewBody 
-        className="bg-white"
-        loading={
-            status === "working" ? (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-neutral-900/90 backdrop-blur-[2px]">
-                   <div className="flex flex-col items-center gap-4">
-                     <div className="relative">
-                        <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse"></div>
-                        <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center relative">
-                            <Loader size={32} className="text-blue-500 animate-spin" />
-                        </div>
-                     </div>
-                     <div className="text-center space-y-1">
-                        <p className="text-sm font-medium text-neutral-300">Setting up environment</p>
-                        <p className="text-xs text-neutral-500">Installing dependencies and starting server...</p>
-                     </div>
-                   </div>
-                </div>
-            ) : undefined
-        } 
-       />
+      {viewMode === "preview" ? (
+          <WebPreviewBody 
+            className="bg-white"
+            loading={
+                status === "working" ? (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-neutral-900/90 backdrop-blur-[2px]">
+                       <div className="flex flex-col items-center gap-4">
+                         <div className="relative">
+                            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full animate-pulse"></div>
+                            <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center relative">
+                                <Loader size={32} className="text-blue-500 animate-spin" />
+                            </div>
+                         </div>
+                         <div className="text-center space-y-1">
+                            <p className="text-sm font-medium text-neutral-300">Setting up environment</p>
+                            <p className="text-xs text-neutral-500">Installing dependencies and starting server...</p>
+                         </div>
+                       </div>
+                    </div>
+                ) : undefined
+            } 
+           />
+      ) : (
+          <CodeExplorer projectId={projectId} className="flex-1 border-0 rounded-none bg-neutral-900" />
+      )}
     </WebPreview>
   );
 }

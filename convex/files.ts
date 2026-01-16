@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 // FILE OPERATIONS
@@ -37,7 +37,48 @@ export const save = mutation({
   },
 });
 
+// Internal mutation for agent (bypasses auth)
+export const saveInternal = internalMutation({
+  args: { 
+    projectId: v.id("projects"),
+    path: v.string(),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+        .query("files")
+        .withIndex("by_projectId_path", (q) => 
+            q.eq("projectId", args.projectId).eq("path", args.path)
+        )
+        .first();
+
+    if (existing) {
+        await ctx.db.patch(existing._id, { content: args.content });
+    } else {
+        await ctx.db.insert("files", {
+            projectId: args.projectId,
+            path: args.path,
+            content: args.content,
+        });
+    }
+  },
+});
+
 export const read = query({
+  args: { projectId: v.id("projects"), path: v.string() },
+  handler: async (ctx, args) => {
+      const file = await ctx.db
+          .query("files")
+          .withIndex("by_projectId_path", (q) => 
+              q.eq("projectId", args.projectId).eq("path", args.path)
+          )
+          .first();
+      return file ? file.content : null;
+  },
+});
+
+// Internal query for agent (bypasses auth)
+export const readInternal = internalQuery({
   args: { projectId: v.id("projects"), path: v.string() },
   handler: async (ctx, args) => {
       const file = await ctx.db
@@ -54,6 +95,17 @@ export const getFiles = query({
     args: { projectId: v.id("projects") },
     handler: async (ctx, args) => {
         // TODO: Auth check needed here in prod
+        return await ctx.db
+            .query("files")
+            .withIndex("by_projectId", q => q.eq("projectId", args.projectId))
+            .collect();
+    }
+})
+
+// Internal query for agent (bypasses auth)
+export const getFilesInternal = internalQuery({
+    args: { projectId: v.id("projects") },
+    handler: async (ctx, args) => {
         return await ctx.db
             .query("files")
             .withIndex("by_projectId", q => q.eq("projectId", args.projectId))
@@ -89,6 +141,25 @@ export const saveSystemTemplate = mutation({
 });
 
 export const deleteFile = mutation({
+    args: {
+        projectId: v.id("projects"),
+        path: v.string()
+    },
+    handler: async (ctx, args) => {
+        const existing = await ctx.db
+            .query("files")
+            .withIndex("by_projectId_path", (q) => 
+                q.eq("projectId", args.projectId).eq("path", args.path)
+            )
+            .first();
+        if (existing) {
+            await ctx.db.delete(existing._id);
+        }
+    }
+});
+
+// Internal mutation for agent (bypasses auth)
+export const deleteFileInternal = internalMutation({
     args: {
         projectId: v.id("projects"),
         path: v.string()

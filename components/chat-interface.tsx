@@ -31,68 +31,38 @@ export default function ChatInterface({
   const sendMessage = useMutation(api.messages.send);
 
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  // Derived state for "Thinking"
+  const lastMessage = messages?.[messages.length - 1];
+  const isThinking = hasActiveSandbox && lastMessage?.role === "user";
 
   // Auto-scroll to bottom of messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading, isInitializing]);
-
+  }, [messages, isThinking, isInitializing]);
 
   const handleSubmit = async (value: string) => {
-      if (!value.trim() || loading || isInitializing) return;
+      if (!value.trim() || isThinking || isInitializing) return;
       
       const userContent = value;
       setInput(""); 
-      setLoading(true);
-
+      
       try {
           // 1. Save User Message to Convex
+          // This automatically triggers the background Agent via the mutation trigger
           await sendMessage({ 
               projectId, 
               role: "user", 
               content: userContent 
           });
 
-          // 2. Trigger AI Response or Initialization
+          // 2. Trigger Initialization if needed
           if (!hasActiveSandbox) {
               onInitialize(userContent);
-          } else {
-               const res = await fetch("/api/chat", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    projectId,
-                    messages: [
-                        ...messages.map(m => ({ role: m.role, content: m.content })),
-                        { role: "user", content: userContent }
-                    ],
-                  }),
-                });
+          } 
           
-                const data = await res.json();
-                
-                // Save AI Response to Convex
-                if (data.error) {
-                    await sendMessage({ 
-                        projectId, 
-                        role: "assistant", 
-                        content: `Error: ${data.error}` 
-                    });
-                } else {
-                     await sendMessage({ 
-                        projectId, 
-                        role: "assistant", 
-                        content: data.content 
-                    });
-                }
-          }
-
       } catch (error) {
         console.error(error);
-      } finally {
-        setLoading(false);
       }
   };
 
@@ -127,7 +97,7 @@ export default function ChatInterface({
         ))}
         
         {/* Loading Indicators */}
-        {(loading || isInitializing) && (
+        {(isThinking || isInitializing) && (
            <Message from="assistant" className="mr-auto">
               <div className="flex items-center gap-2 text-neutral-400 text-sm py-2">
                  <Loader size={16} />
@@ -147,10 +117,10 @@ export default function ChatInterface({
             <PromptInputTextarea 
                 placeholder={hasActiveSandbox ? "Ask to make changes..." : "Describe an app to start..."}
                 className="min-h-[60px]"
-                disabled={loading || isInitializing}
+                disabled={isThinking || isInitializing}
             />
             <div className="flex justify-end p-2 border-t border-neutral-800">
-                <PromptInputSubmit disabled={loading || isInitializing}>
+                <PromptInputSubmit disabled={isThinking || isInitializing}>
                     <Send className="size-4" />
                 </PromptInputSubmit>
             </div>

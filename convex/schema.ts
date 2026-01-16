@@ -6,6 +6,8 @@ export default defineSchema({
     userId: v.string(),     // Clerk User ID
     title: v.string(),      // Project title
     createdAt: v.number(),  // Timestamp
+    projectType: v.optional(v.union(v.literal("react"), v.literal("nextjs"))), // Project framework type
+    needsSandboxRestart: v.optional(v.boolean()), // Signal to frontend that sandbox needs restart
   })
   .index("by_userId", ["userId"]),
   

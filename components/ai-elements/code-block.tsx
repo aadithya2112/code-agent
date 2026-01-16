@@ -91,6 +91,8 @@ export const CodeBlock = ({
         setDarkHtml(dark);
         mounted.current = true;
       }
+    }).catch(err => {
+        console.error("CodeBlock: highlighting failed", err);
     });
 
     return () => {

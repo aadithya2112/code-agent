@@ -1,4 +1,5 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
 export const send = mutation({
@@ -16,11 +17,37 @@ export const send = mutation({
         throw new Error("Unauthorized");
     }
 
-    return await ctx.db.insert("messages", {
+    await ctx.db.insert("messages", {
         projectId: args.projectId,
         role: args.role,
         content: args.content,
         userId: identity.tokenIdentifier,
+    });
+
+    if (args.role === "user") {
+        await ctx.scheduler.runAfter(0, (internal as any).agent.chat, {
+            projectId: args.projectId,
+            userId: identity.tokenIdentifier,
+            latestUserMessage: args.content, // Pass the message that just triggered this
+        });
+    }
+  },
+});
+
+// Internal mutation for agent to save messages (bypasses auth checks)
+export const sendInternal = internalMutation({
+  args: { 
+    projectId: v.id("projects"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("messages", {
+        projectId: args.projectId,
+        role: args.role,
+        content: args.content,
+        userId: args.userId,
     });
   },
 });

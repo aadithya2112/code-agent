@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 // EXISTING CODE... (create, list, etc)
@@ -88,7 +88,63 @@ export const applyTemplate = mutation({
             }
         }
     }
+    
+    // Update project with the type
+    await ctx.db.patch(args.projectId, {
+        projectType: args.template
+    });
   }
+});
+
+export const get = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== identity.tokenIdentifier) {
+      return null;
+    }
+    
+    return project;
+  },
+});
+
+export const getInternal = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    // No auth check - used by agent which does its own verification
+    return await ctx.db.get(args.projectId);
+  },
+});
+
+// Set flag to signal sandbox restart needed (internal, called by agent)
+export const setRestartFlag = internalMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      needsSandboxRestart: true,
+    });
+  },
+});
+
+// Clear restart flag from frontend after restart completes
+export const clearRestartFlag = mutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== identity.tokenIdentifier) {
+      throw new Error("Unauthorized");
+    }
+    
+    await ctx.db.patch(args.projectId, {
+      needsSandboxRestart: false,
+    });
+  },
 });
 
 export const list = query({
