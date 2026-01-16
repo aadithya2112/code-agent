@@ -11,6 +11,9 @@
 import type * as agent from "../agent.js";
 import type * as editor from "../editor.js";
 import type * as files from "../files.js";
+import type * as lib_prompts from "../lib/prompts.js";
+import type * as lib_tool_definitions from "../lib/tool_definitions.js";
+import type * as lib_tools from "../lib/tools.js";
 import type * as messages from "../messages.js";
 import type * as projects from "../projects.js";
 
@@ -24,6 +27,9 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   editor: typeof editor;
   files: typeof files;
+  "lib/prompts": typeof lib_prompts;
+  "lib/tool_definitions": typeof lib_tool_definitions;
+  "lib/tools": typeof lib_tools;
   messages: typeof messages;
   projects: typeof projects;
 }>;

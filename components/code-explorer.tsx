@@ -5,20 +5,16 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Loader } from "@/components/ai-elements/loader";
 import { cn } from "@/lib/utils";
-import { 
-  ChevronRight, 
-  ChevronDown, 
-  File, 
-  Folder, 
-  FileCode, 
-  FileJson, 
-  FileIcon,
+import {
   AlertCircle,
-  Save
+  Save,
+  FileCode,
+  FileIcon
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef } from "react";
 import Editor, { useMonaco, type Monaco } from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
+import { FileTree, type FileNode } from "@/components/file-tree";
 
 interface CodeExplorerProps {
   projectId: Id<"projects">;
@@ -26,13 +22,6 @@ interface CodeExplorerProps {
   className?: string;
 }
 
-type FileNode = {
-  name: string;
-  path: string;
-  type: "file" | "folder";
-  children?: FileNode[];
-  content?: string;
-};
 
 export default function CodeExplorer({ projectId, sandboxID, className }: CodeExplorerProps) {
   const files = useQuery(api.files.getFiles, { projectId });
@@ -356,92 +345,3 @@ export default function CodeExplorer({ projectId, sandboxID, className }: CodeEx
   );
 }
 
-// Recursive File Tree Component
-function FileTree({ 
-    nodes, 
-    selectedFile, 
-    onSelect 
-}: { 
-    nodes: FileNode[], 
-    selectedFile: string | null, 
-    onSelect: (path: string) => void 
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      {nodes.map((node) => (
-        <FileTreeNode 
-            key={node.path} 
-            node={node} 
-            selectedFile={selectedFile} 
-            onSelect={onSelect} 
-        />
-      ))}
-    </div>
-  );
-}
-
-function FileTreeNode({ 
-    node, 
-    selectedFile, 
-    onSelect 
-}: { 
-    node: FileNode, 
-    selectedFile: string | null, 
-    onSelect: (path: string) => void 
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const isSelected = selectedFile === node.path;
-  
-  const handleClick = () => {
-    if (node.type === "folder") {
-      setIsOpen(!isOpen);
-    } else {
-      onSelect(node.path);
-    }
-  };
-
-  const getIcon = () => {
-      if (node.type === "folder") return <Folder size={14} className={cn("text-blue-400", isOpen && "fill-blue-400/20")} />;
-      if (node.name.endsWith("json")) return <FileJson size={14} className="text-yellow-400" />;
-      if (node.name.endsWith("tsx") || node.name.endsWith("ts")) return <FileCode size={14} className="text-blue-400" />;
-      if (node.name.endsWith("css")) return <FileCode size={14} className="text-sky-300" />;
-      return <File size={14} className="text-neutral-400" />;
-  };
-
-  return (
-    <div className="select-none">
-      <div 
-        className={cn(
-            "flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors text-sm",
-            isSelected ? "bg-blue-500/10 text-blue-400" : "hover:bg-neutral-800 text-neutral-400"
-        )}
-        onClick={handleClick}
-        style={{ paddingLeft: `${(node.path.split("/").length - 1) * 12 + 8}px` }} // Indent based on depth (rough check)
-        // Better depth approach: pass depth as prop
-      >
-        <span className="flex-shrink-0 opacity-70">
-            {node.type === "folder" && (
-                isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-            )}
-            {node.type === "file" && <div className="w-3.5" />} {/* Spacer */}
-        </span>
-        
-        {getIcon()}
-        
-        <span className="truncate">{node.name}</span>
-      </div>
-
-      {node.type === "folder" && isOpen && node.children && (
-        <div>
-           {/* We don't need recursive padding here because I did the cheap padding hack above based on path split.
-               However, strictly speaking, a recursive render without padding wrapper is cleaner if we pass depth.
-               Let's stick to the current recursion loop which just renders children.
-               The padding calculation above `node.path.split("/").length` handles the indent globally.
-            */}
-          <FileTree nodes={node.children} selectedFile={selectedFile} onSelect={onSelect} />
-        </div>
-      )}
-    </div>
-  );
-}

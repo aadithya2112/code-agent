@@ -203,7 +203,13 @@ export async function initializeProject(projectId: Id<"projects">) {
     // 0. Files are expected to be in Convex by now (handled by client)
 
     // 1. Setup (Hydrate + Install + Start)
-    const port = await setupProject(sandboxId, projectId);
-    
-    return { sandboxId, port };
+    // 1. Setup (Hydrate + Install + Start)
+    try {
+        const port = await setupProject(sandboxId, projectId);
+        return { sandboxId, port };
+    } catch (error) {
+        console.error("Setup failed, cleaning up sandbox:", error);
+        await stopSandbox(sandboxId);
+        throw error;
+    }
 }

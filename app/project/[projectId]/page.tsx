@@ -2,8 +2,9 @@
 
 import ChatInterface from "@/components/chat-interface";
 import PreviewPane from "@/components/preview-pane";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { initializeProject, stopSandbox, detectProjectType } from "@/lib/actions";
+
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
@@ -21,6 +22,24 @@ export default function ProjectPage() {
     // implicitly via the ChatInterface not loading messages.
 
     const [sandboxID, setSandboxID] = useState<string | null>(null);
+    // Ref to track sandbox ID for cleanup on unmount
+    const sandboxRef = useRef<string | null>(null);
+    
+    // Keep ref in sync
+    useEffect(() => {
+        sandboxRef.current = sandboxID;
+    }, [sandboxID]);
+
+    // Cleanup on unmount (navigation or close)
+    useEffect(() => {
+        return () => {
+            if (sandboxRef.current) {
+                console.log("Navigating away - stopping sandbox...");
+                stopSandbox(sandboxRef.current);
+            }
+        };
+    }, []);
+
     const [port, setPort] = useState(0);
     const [projectType, setProjectType] = useState<"react" | "nextjs" | null>(null);
     const [status, setStatus] = useState<"idle" | "working" | "ready" | "stopping">("idle");

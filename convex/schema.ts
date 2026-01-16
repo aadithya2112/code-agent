@@ -13,9 +13,14 @@ export default defineSchema({
   
   messages: defineTable({
     projectId: v.id("projects"),  
-    role: v.union(v.literal("user"), v.literal("assistant")),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
-    userId: v.string(),     
+    userId: v.string(),
+    toolCall: v.optional(v.object({
+        name: v.string(),
+        args: v.any(),
+        result: v.optional(v.string())
+    })),
   })
   .index("by_projectId", ["projectId"]),
 

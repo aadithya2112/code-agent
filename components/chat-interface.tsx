@@ -9,6 +9,7 @@ import { Message, MessageResponse } from "@/components/ai-elements/message";
 import { Loader } from "@/components/ai-elements/loader";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/components/ai-elements/tool";
 import { Id } from "@/convex/_generated/dataModel";
 
 interface ChatInterfaceProps {
@@ -33,7 +34,9 @@ export default function ChatInterface({
   const [input, setInput] = useState("");
   // Derived state for "Thinking"
   const lastMessage = messages?.[messages.length - 1];
-  const isThinking = hasActiveSandbox && lastMessage?.role === "user";
+  // Thinking if there is an active sandbox AND the last message is NOT a final assistant completion
+  // (User just spoke OR we are seeing system logs)
+  const isThinking = hasActiveSandbox && lastMessage?.role !== "assistant";
 
   // Auto-scroll to bottom of messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -42,21 +45,19 @@ export default function ChatInterface({
   }, [messages, isThinking, isInitializing]);
 
   const handleSubmit = async (value: string) => {
+      // ... (no changes here)
       if (!value.trim() || isThinking || isInitializing) return;
       
       const userContent = value;
       setInput(""); 
       
       try {
-          // 1. Save User Message to Convex
-          // This automatically triggers the background Agent via the mutation trigger
           await sendMessage({ 
               projectId, 
               role: "user", 
               content: userContent 
           });
 
-          // 2. Trigger Initialization if needed
           if (!hasActiveSandbox) {
               onInitialize(userContent);
           } 
@@ -77,28 +78,58 @@ export default function ChatInterface({
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
         {messages.length === 0 && !isInitializing && !hasActiveSandbox && (
-             <Message from="assistant" className="mr-auto">
+             <Message from="assistant">
                 <MessageResponse>
                     Hello! Describe the app you want to build (e.g., 'A simple React todo list' or 'A Next.js dashboard with API').
                 </MessageResponse>
              </Message>
         )}
         
-        {messages.map((m) => (
+        {messages.map((m) => {
+          if (m.role === "system") {
+              const toolCall = m.toolCall;
+              if (!toolCall) return null; // Should not happen for system role
+
+              const isComplete = !!toolCall.result;
+              const isError = toolCall.result?.startsWith("Error:");
+
+              return (
+                 <Message key={m._id} from="assistant">
+                 <Tool defaultOpen={!isComplete}>
+                    <ToolHeader 
+                        type="tool-call" // Or generic string
+                        title={toolCall.name}
+                        state={isError ? "output-error" : isComplete ? "output-available" : "input-available"}
+                    />
+                    <ToolContent>
+                        <ToolInput input={toolCall.args} />
+                        {isComplete && (
+                            <ToolOutput 
+                                output={toolCall.result} 
+                                errorText={isError ? toolCall.result : undefined}
+                            />
+                        )}
+                    </ToolContent>
+                 </Tool>
+                 </Message>
+              )
+          }
+          return (
           <Message 
             key={m._id} 
             from={m.role === "user" ? "user" : "assistant"}
-            className={m.role === "user" ? "ml-auto max-w-[85%]" : "mr-auto max-w-[85%]"}
+            className="" // Let component handle layout
           >
              <MessageResponse>
                 {m.content}
              </MessageResponse>
           </Message>
-        ))}
+          );
+        })}
         
         {/* Loading Indicators */}
         {(isThinking || isInitializing) && (
-           <Message from="assistant" className="mr-auto">
+           <Message from="assistant">
               <div className="flex items-center gap-2 text-neutral-400 text-sm py-2">
                  <Loader size={16} />
                  <span>{isInitializing ? "Setting up your environment..." : "Thinking..."}</span>

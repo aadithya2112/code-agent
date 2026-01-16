@@ -38,18 +38,40 @@ export const send = mutation({
 export const sendInternal = internalMutation({
   args: { 
     projectId: v.id("projects"),
-    role: v.union(v.literal("user"), v.literal("assistant")),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
     userId: v.string(),
+    toolCall: v.optional(v.object({
+        name: v.string(),
+        args: v.any(),
+        result: v.optional(v.string())
+    })),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("messages", {
+    return await ctx.db.insert("messages", {
         projectId: args.projectId,
         role: args.role,
         content: args.content,
         userId: args.userId,
+        toolCall: args.toolCall,
     });
   },
+});
+
+export const updateInternal = internalMutation({
+    args: {
+        messageId: v.id("messages"),
+        toolCall: v.object({
+            name: v.string(),
+            args: v.any(),
+            result: v.optional(v.string())
+        })
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.messageId, {
+            toolCall: args.toolCall
+        });
+    }
 });
 
 export const list = query({

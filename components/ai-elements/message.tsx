@@ -18,7 +18,10 @@ import {
   ChevronRightIcon,
   PaperclipIcon,
   XIcon,
+  Sparkles,
+  User
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -27,15 +30,38 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
 };
 
-export const Message = ({ className, from, ...props }: MessageProps) => (
+export const Message = ({ className, from, children, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full max-w-[95%] flex-col gap-2",
-      from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
+      "group flex w-full max-w-3xl gap-4 mb-6",
+      from === "user" ? "is-user ml-auto flex-row-reverse" : "is-assistant",
       className
     )}
     {...props}
-  />
+  >
+    <div className="flex-shrink-0 mt-1">
+        <Avatar className={cn("w-8 h-8 flex items-center justify-center border", 
+            from === "user" ? "bg-secondary border-neutral-700" : "bg-primary/10 border-primary/20"
+        )}>
+            {from === "user" ? (
+                // Setup for user avatar if available, else fallback
+                <>
+                  <AvatarImage src="" /> 
+                  <AvatarFallback className="bg-transparent text-neutral-400"><User size={16} /></AvatarFallback>
+                </>
+            ) : (
+                <AvatarFallback className="bg-transparent text-primary"><Sparkles size={16} /></AvatarFallback>
+            )}
+        </Avatar>
+    </div>
+
+    <div className={cn("flex flex-col gap-1 min-w-0 max-w-full", from === "user" ? "items-end" : "items-start")}>
+        <div className="text-xs text-neutral-500 font-medium px-1 flex items-center gap-2">
+            {from === "user" ? "You" : "Code Agent"}
+        </div>
+        {children}
+    </div>
+  </div>
 );
 
 export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
@@ -48,8 +74,12 @@ export const MessageContent = ({
   <div
     className={cn(
       "is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-sm",
-      "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
-      "group-[.is-assistant]:text-foreground",
+      // User bubble styles
+      "group-[.is-user]:rounded-2xl group-[.is-user]:rounded-tr-sm group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
+      // Assistant styles (no bubble, just text, or maybe bubble?)
+      "group-[.is-assistant]:text-foreground group-[.is-assistant]:leading-relaxed", 
+      // Fix for inline code contrast in user bubbles (assuming white text, we need dark bg or specific styling)
+      "group-[.is-user]:[&_:not(pre)>code]:bg-zinc-800/10 group-[.is-user]:[&_:not(pre)>code]:text-current group-[.is-user]:[&_:not(pre)>code]:px-1.5 group-[.is-user]:[&_:not(pre)>code]:py-0.5 group-[.is-user]:[&_:not(pre)>code]:rounded-md group-[.is-user]:[&_:not(pre)>code]:font-mono",
       className
     )}
     {...props}
