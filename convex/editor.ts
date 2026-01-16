@@ -28,10 +28,15 @@ export const saveAndSync = action({
                 apiKey: process.env.E2B_API_KEY,
             });
 
+            // Normalize path: ensure no leading slash
+            const cleanPath = args.path.replace(/^\/+/, '');
+            
+            // Construct absolute path in sandbox
+            // The dev server usually runs in /home/user/app
+            const absolutePath = `/home/user/app/${cleanPath}`;
+
             // Write file directly to sandbox filesystem
-            // Note: writing to the root often requires matching the structure.
-            // In the agent, paths are usually relative.
-            await (sandbox as any).filesystem.write(args.path, args.content);
+            await sandbox.files.write(absolutePath, args.content);
             
             console.log(`Synced ${args.path} to sandbox ${args.sandboxID}`);
             
