@@ -3,13 +3,13 @@
 import ChatInterface from "@/components/chat-interface";
 import PreviewPane from "@/components/preview-pane";
 import { useState, useEffect } from "react";
-import { initializeProject, stopSandbox } from "@/lib/actions";
+import { initializeProject, stopSandbox, detectProjectType } from "@/lib/actions";
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 export default function ProjectPage() {
@@ -25,14 +25,24 @@ export default function ProjectPage() {
     const [projectType, setProjectType] = useState<"react" | "nextjs" | null>(null);
     const [status, setStatus] = useState<"idle" | "working" | "ready" | "stopping">("idle");
 
+    const applyTemplate = useMutation(api.projects.applyTemplate);
+
     const handleInitialize = async (prompt: string) => {
         try {
             setStatus("working");
-            const result = await initializeProject(prompt);
+            
+            // 1. Detect Type
+            const type = await detectProjectType(prompt);
+            setProjectType(type);
+
+            // 2. Apply Template (Authenticated Client Mutation)
+            await applyTemplate({ projectId, template: type });
+
+            // 3. Start Sandbox
+            const result = await initializeProject(projectId);
             
             setSandboxID(result.sandboxId);
             setPort(result.port);
-            setProjectType(result.type);
             setStatus("ready");
         } catch (e) {
             console.error(e);

@@ -2,15 +2,16 @@
 
 import { Sandbox } from "@e2b/code-interpreter";
 import { OpenAI } from "openai";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api";
+import { Id } from "../convex/_generated/dataModel";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
 });
 
-// We need to keep track of sandboxes to kill them, but in a serverless/server action env
-// we might lose state. For a simple demo, we'll return the ID and rely on the client to pass it back.
-// The Sandbox object relies on connecting to the running instance by ID.
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export async function startSandbox() {
   const apiKey = process.env.E2B_API_KEY;
@@ -81,46 +82,81 @@ export async function detectProjectType(prompt: string): Promise<"react" | "next
     }
 }
 
-export async function setupProject(sandboxId: string, template: "react" | "nextjs" = "react") {
-    const sandbox = await Sandbox.connect(sandboxId);
-    
-    let repoUrl = "";
-    let dirName = "";
-    let port = 0;
+// Hydrate E2B from Convex Files
+async function hydrateSandbox(sandbox: Sandbox, projectId: Id<"projects">) {
+    const files = await convex.query(api.files.getFiles, { projectId });
+    console.log(`[Hydrate] Found ${files.length} files for project ${projectId}`);
 
-    if (template === "react") {
-        repoUrl = "https://github.com/aadithya2112/code-agent-react-starter.git"; 
-        dirName = "code-agent-react-starter";
-        port = 5173;
-    } else {
-        repoUrl = "https://github.com/aadithya2112/code-agent-nextjs-starter.git";
-        dirName = "code-agent-nextjs-starter";
-        port = 3000;
+    if (files.length === 0) {
+        throw new Error("No files found in Convex. Template application failed?");
     }
 
-    // 1. Clone
-    await sandbox.commands.run(`git clone ${repoUrl}`);
+    // 2. Write to E2B (Parallel) to /home/user/app
+    await Promise.all(files.map(async file => {
+        // file.path is like "/app/page.tsx" or "/package.json"
+        
+        // Strip leading slash to be safe for joining
+        const relativePath = file.path.startsWith("/") ? file.path.substring(1) : file.path;
+        const fullPath = `/home/user/app/${relativePath}`;
+        
+        const dir = fullPath.split("/").slice(0, -1).join("/");
+        if (dir) {
+             try { await sandbox.files.makeDir(dir); } catch(e) {}
+        }
+        return await sandbox.files.write(fullPath, file.content);
+    }));
 
-    // 2. Install (NPM)
-    await sandbox.commands.run(`cd ${dirName} && npm install`);
+    // DEBUG: Check files exist
+    const ls = await sandbox.files.list("/home/user/app");
+    console.log(`[Hydrate] App files: ${ls.map(f => f.name).join(", ")}`);
+
+    const hasPackageJson = ls.some(f => f.name === "package.json");
+    if (!hasPackageJson) {
+        throw new Error("Hydration failed: package.json missing in /home/user/app");
+    }
+}
+
+export async function setupProject(sandboxId: string, projectId: Id<"projects">) {
+    const sandbox = await Sandbox.connect(sandboxId);
+    
+    // 1. Hydrate Code from DB
+    await hydrateSandbox(sandbox, projectId);
+
+    // 2. Install Dependencies
+    console.log("[Setup] Running npm install...");
+    try {
+        const install = await sandbox.commands.run(`cd /home/user/app && npm install`);
+        if (install.exitCode !== 0) {
+            console.error("npm install failed:", install.stderr);
+            throw new Error(`npm install failed: ${install.stderr}`);
+        }
+    } catch (e: any) {
+        console.error("npm install crashed:", JSON.stringify(e, null, 2));
+        if (e.stderr) console.error("Stderr from crash:", e.stderr);
+        throw e;
+    }
 
     // 3. Start Server
-    // The repositories are now pre-configured to bind to 0.0.0.0 and allow hosts.
-    // For React: vite.config.ts has server: { host: true, allowedHosts: true }
-    // For Next.js: package.json script has "dev": "next dev -H 0.0.0.0" (or equivalent config)
+    const packageJsonContent = await sandbox.files.read("/home/user/app/package.json");
+    const packageJson = JSON.parse(packageJsonContent);
+    const isNext = !!(packageJson.dependencies?.next || packageJson.devDependencies?.next);
+    const port = isNext ? 3000 : 5173;
     
-    await sandbox.commands.run(`cd ${dirName} && npm run dev`, { background: true });
+    console.log(`[Setup] Detected project type: ${isNext ? "Next.js" : "React"} (Port ${port})`);
 
-    // Return the port we expect
+    const start = await sandbox.commands.run(`cd /home/user/app && npm run dev`, { background: true });
+    console.log(`[Setup] Server started (PID ${start.pid})`);
+
     return port;
 }
 
-export async function initializeProject(prompt: string) {
+export async function initializeProject(projectId: Id<"projects">) {
     const sandboxId = await startSandbox();
-    const type = await detectProjectType(prompt);
     
-    // We can return early info to UI if we want (streaming), but here we await setup
-    const port = await setupProject(sandboxId, type);
+    // 0. Files are expected to be in Convex by now (handled by client)
+
+    // 1. Setup (Hydrate + Install + Start)
+    const port = await setupProject(sandboxId, projectId);
     
-    return { sandboxId, type, port };
+    return { sandboxId, port };
 }

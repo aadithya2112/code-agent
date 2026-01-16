@@ -1,10 +1,15 @@
 import { OpenAI } from "openai";
 import { Sandbox } from "@e2b/code-interpreter";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api";
+import { Id } from "../convex/_generated/dataModel";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
 });
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 const MODEL = "deepseek/deepseek-chat";
 
@@ -92,7 +97,7 @@ export async function createSandbox() {
   return await Sandbox.create();
 }
 
-export async function runAgent(messages: any[], sandbox: Sandbox) {
+export async function runAgent(messages: any[], sandbox: Sandbox, projectId?: Id<"projects">) {
   let currentMessages = [...messages];
   
   // Max turns to prevent infinite loops
@@ -124,10 +129,19 @@ export async function runAgent(messages: any[], sandbox: Sandbox) {
             if (toolCall.function.name === "write_file") {
             const dir = args.path.substring(0, args.path.lastIndexOf('/'));
             if (dir) {
-                await sandbox.files.makeDir(dir);
+                try { await sandbox.files.makeDir(dir); } catch(e) {}
             }
             await sandbox.files.write(args.path, args.content);
-            result = `File ${args.path} written successfully.`;
+
+            if (projectId) {
+                await convex.mutation(api.files.save, { 
+                    projectId, 
+                    path: args.path.startsWith("/") ? args.path : "/" + args.path, 
+                    content: args.content 
+                });
+            }
+
+            result = `File ${args.path} written successfully to Sandbox and Database.`;
 
           } else if (toolCall.function.name === "run_command") {
             console.log(`[Agent] Running command: ${args.command}`);

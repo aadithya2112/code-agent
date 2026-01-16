@@ -11,7 +11,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, sandboxID } = await req.json();
+    const { messages, sandboxID, projectId } = await req.json();
 
     let sandbox;
     let newSandboxID = sandboxID;
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // We'll trust the sandbox default timeout for now.
     // await sandbox.keepAlive(30 * 60 * 1000); 
 
-    const responseContent = await runAgent(messages, sandbox);
+    const responseContent = await runAgent(messages, sandbox, projectId);
 
     // Return the response, and also the sandboxID so the client can reuse it.
     // Also we might want to return the URL of the running app?

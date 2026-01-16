@@ -63,6 +63,7 @@ export default function ChatInterface({
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
+                    projectId,
                     messages: [
                         ...messages.map(m => ({ role: m.role, content: m.content })),
                         { role: "user", content: userContent }
